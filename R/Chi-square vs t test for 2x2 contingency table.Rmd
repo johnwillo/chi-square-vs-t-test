@@ -1,0 +1,203 @@
+---
+title: "Chi-square vs t-test for 2x2 contingency table"
+author: "John Willoughby"
+date: "2024/06/15"
+output: html_document
+bibliography: references.bib
+---
+
+## Introduction
+
+When comparing two independent samples a common recommendation is to use a t test for continuous data and a chi-square test on binomial data. In fact I have made this recommendation myself. Recently, however, when researching the use of a non-inferiority test applied to binomial data, I came upon a paper by D'Agostino et al. [-@dagostinoAppropriatenessCommonProcedures1988], which recommended the use of *either* the Pearson chi-square test (without the Yates' correction for continuity) *or* an independent-sample t test for testing the equality of two independent binomial populations.
+
+This was surprising to me so I applied both a chi-square test and a t-test to two data frames. The first data frame (mydata1) consists of 400 frequency quadrats, 200 of which were randomly located in a treatment area and 200 in a reference area. In each quadrat a target plant species was recorded either as present (1) or absent (0). The proportion of quadrats containing the plant was 0.54 in the reference area and 0.45 in the treatment area. The second data frame (mydata2) has the same number of frequency quadrats in both areas but frequencies (proportions of quadrats containing the plant) are much lower, only 0.04 for the reference area and 0.025 for the treatment area.
+
+As shown below, a t test performed on the 0's and 1's gives essentially the same p value as a chi-square test on the same data.
+
+Load needed packages and the two data frames and look at the first 6 rows of each data frame.
+
+```{r message = FALSE}
+library(here) # To find data files in the project directory
+library(tidyverse) # Loads ggplot2, dplyr, and several other packages
+library(flextable) # To produce tables
+
+my.data1 = read_csv(here("Data", "IMPL_freq.csv"))
+my.data2 = read_csv(here("Data", "test.small.prop.csv"))
+
+head(my.data1)
+head(my.data2)
+
+```
+
+Note that to apply a t test to the data, the data must be entered on a sampling unit-by-sampling unit basis rather than as a contingency table. But we can view the data as a contingency table. Here's my.data1 as a contingency table.
+
+```{r}
+# View as contingency table
+table(my.data1$status, my.data1$area)
+
+```
+
+Perform a chi-square test and t test on my.data1. Note that we've set correct = FALSE for the chi-square test to tell R *not* to apply the Yates' correction for continuity (which it will do by default if we don't tell it not to). D'Agostino et al. and many other authors have shown the continuity correction to be too conservative.
+
+```{r}
+chisq.test(my.data1$status, my.data1$area, correct = FALSE)
+t.test(status ~ area, data = my.data1, var.equal = TRUE)
+```
+
+The p value from the uncorrected chi-square test is 0.07185, while that from the t test is 0.07216, essentially the same value to three decimals.
+
+But the frequencies (proportion of quadrats occupied) in my.data1 for both the reference (0.54) and treatment (0.45) areas are close to 0.50. It is well known that the normal (or t) distribution provides a good approximation to the binomial distribution when population proportions are close to 0.5, but that this approximation becomes increasingly poor as population proportions approach 0 or 1. So let's look at a comparison of the two tests on my.data2, which has frequencies of 0.025 and 0.04 for the treatment and reference areas, respectively.
+
+```{r}
+# View my.data2 as contingency table
+table(my.data2$status, my.data2$area)
+
+# Chi-square and t test
+
+chisq.test(my.data2$status, my.data2$area, correct = FALSE)
+t.test(status ~ area, data = my.data2, var.equal = TRUE)
+
+
+```
+
+For this data set, with reference and treatment frequencies of 0.04 and 0.025, respectively, the p values obtained from the chi-square and t tests are still essentially the same to 3 decimals.
+
+These results certainly support the observations of D'Agostino et al., but questions remain. Both of these samples were relatively large (200 quadrats in each of the two areas) and the samples in each area were the same size. Let's look at comparisons between the tests with a range of sample sizes, in situations where the sample sizes in the two areas differ, and for a range of observed frequencies.
+
+## Chi-square and t tests on 35 different sampling scenarios
+
+Let's examine 35 different several sampling scenarios. In each of these scenarios we'll set the probability of each of the two samples to be the same, so we're essentially assuming that the two samples come from the same population, which means we're examining the null distribution for a population corresponding to the specified frequency. We'll set the number of simulations to 1000 for each comparison.
+
+Note that I am not setting a random number seed for these simulations, so if you run the simulations you will get somewhat different results.
+
+The following combinations of probability, n1 size, and n2 size are run:
+
+|  p   |  n1  |  n2  |
+|:----:|:----:|:----:|
+| 0.01 |  50  |  50  |
+| 0.01 |  50  | 100  |
+| 0.01 | 100  | 100  |
+| 0.01 | 100  | 200  |
+| 0.01 | 200  | 200  |
+| 0.01 | 500  | 500  |
+| 0.01 | 1000 | 1000 |
+| 0.05 |  50  |  50  |
+| 0.05 |  50  | 100  |
+| 0.05 | 100  | 100  |
+| 0.05 | 100  | 200  |
+| 0.05 | 200  | 200  |
+| 0.05 | 500  | 500  |
+| 0.05 | 1000 | 1000 |
+| 0.10 |  50  |  50  |
+| 0.10 |  50  | 100  |
+| 0.10 | 100  | 100  |
+| 0.10 | 100  | 200  |
+| 0.10 | 200  | 200  |
+| 0.10 | 500  | 500  |
+| 0.10 | 1000 | 1000 |
+| 0.20 |  50  |  50  |
+| 0.20 |  50  | 100  |
+| 0.20 | 100  | 100  |
+| 0.20 | 100  | 200  |
+| 0.20 | 200  | 200  |
+| 0.20 | 500  | 500  |
+| 0.20 | 1000 | 1000 |
+| 0.50 |  50  |  50  |
+| 0.50 |  50  | 100  |
+| 0.50 | 100  | 100  |
+| 0.50 | 100  | 200  |
+| 0.50 | 200  | 200  |
+| 0.50 | 400  | 400  |
+| 0.50 | 1000 | 1000 |
+
+Set the number of simulations to run.
+
+```{r}
+nreps = 1000
+```
+
+Create a data frame with combinations of probabilities and sample sizes for the two samples, n1 and n2, and enough rows to accommodate the number of simulations in nreps above. Add columns p.chi and p.t and fill with NA. The p values for these columns will be filled in by the for loop below.
+
+```{r}
+combos = data.frame(p = rep(c(0.01, 0.05, 0.1, 0.2, 0.5), 
+                            each = 7, times = nreps),
+                    n1 = rep(c(50, 50, 100, 100, 200, 500, 1000), 
+                            times = nreps),
+                    n2 = rep(c(50, 100, 100, 200, 200, 500, 1000), 
+                            times = nreps),
+                    p.chi = rep(NA, times = 7 * nreps),
+                    p.t = rep(NA, times = 7 * nreps))
+```
+
+The for loop below takes the probability and sample sizes in each row of the combos data frame created above, draws two random binomial samples, performs chi-square and t tests on each pair of samples and records the p value for each test.
+
+Note that warnings are turned off in the code creating this data frame. With small sample sizes and small frequencies (probabilities), R returns the following warning for many of the tests:
+
+"In chisq.test(cbind(table(samp1), table(samp2)), correct = correct) : Chi-squared approximation may be incorrect"
+
+This is because when at least one of the cells in the contingency table used for the chi-square test is "sparse", meaning that it has fewer than 5 observations, R returns a warning that the test may be unreliable. Based on a separate analysis I did looking at the realized type I error rates from simulating many chi-square tests, I found that the type I error rate met the desired rate when sample sizes in both areas were at least 50 and probabilities were \>= 0.1. For a a probability of 0.05, at least 100 sampling units in each area were required. A probability of 0.025 required at least 200 sampling units in each area, and a probability of 0.01 required 400-500 sampling units in each area.
+
+```{r warning = FALSE}
+for(i in 1:nrow(combos)){
+  samp1 = rbinom(combos$n1[i], size = 1, prob = combos$p[i])
+  samp2 = rbinom(combos$n2[i], size = 1, prob = combos$p[i])
+  p.chi = chisq.test(cbind(table(samp1), table(samp2)),
+                   correct = FALSE)$p.value
+  p.t = t.test(samp1, samp2, var.equal = TRUE)$p.value
+  
+  combos[i, 4] = p.chi
+  combos[i,5] = p.t
+}
+```
+
+Calculate the difference between the p values for each of the chi-square and t tests and then calculate summary stats for each combination of p, n1, and n2. Summary stats include the mean difference between the two p values (chi-square minus t), the minimum difference, the maximum difference, and the number of absolute differences greater than 0.005. I set the threshold to 0.005 because any difference less than that I consider to support the conclusion that the t test is essentially equivalent to the chi-square test. I also calculate the proportion of times the p value from the t test is greater than the p value from the chi-square test.
+
+When the probability is set to 0.01, it is not at all uncommon to obtain two samples with all zeroes when the sample size is 50 or even 100. The chi-square test on such samples will run with no problem, returning a p value of 1. The t test, however, will fail with two samples with all zeroes and return a value of NaN (which in R speak means "not a number"). In order to calculate summary statistics these NaN values are removed using na.rm = TRUE.
+
+```{r message = FALSE}
+sum.stats = combos |> 
+  mutate(diff = p.chi - p.t) |> 
+  group_by(p, n1, n2) |> 
+  summarise(mn.diff = mean(diff, na.rm = TRUE),
+           prop.abs.diff.greater.0.005 = (sum(abs(diff) > 0.005,
+                                              na.rm = TRUE))/nreps,
+           min.diff = min(diff, na.rm = TRUE),
+           max.diff = max(diff, na.rm = TRUE),
+           prop.t.greater.chi = (sum(diff < 0, na.rm = TRUE))/nreps)
+```
+
+Put the results in a table.
+
+```{r}
+   
+ft = flextable(sum.stats,
+               col_keys = c("p", "n1", "n2", "mn.diff", "min.diff", "max.diff", 
+                            "prop.abs.diff.greater.0.005", "prop.t.greater.chi")
+)
+ft = set_caption(ft,
+                 caption = paste0("Differences between p values from chi-square",
+                                  " and t tests on random binomial samples for various",
+                                  " sample sizes and probabilities based on ", nreps,
+                                  " simulations of each combination.")) |> 
+  colformat_double(j = c("mn.diff", "min.diff", "max.diff"), digits = 4)  |> 
+  set_header_labels(ft, p = "Probability",
+                    mn.diff = "Mean difference between P values from chi-square and t tests",
+                    min.diff = "Minimum difference between P values from chi-square and t tests",
+                    max.diff = "Maximum difference between P values from chi-square and t tests",
+                    prop.abs.diff.greater.0.005 = "Proportion of simulations with absolute difference > 0.005",
+                    prop.t.greater.chi = "Proportion of simulations with P value from t test > P value from chi-square test")
+
+ft
+```
+
+If the mean difference in p values for the two tests is close to zero and there is a low proportion of simulations (preferably 0) with an absolute difference in p values \> 0.005, we'd feel comfortable using a t test in lieu of a chi-square test on binomial data. When probabilities are 0.20 and 0.50 and the sample size is 100 or greater for at least one of the samples, these criteria are met and the t test can be considered to be as good as the chi-square test. When both sample sizes are 50, the proportion of p value differences \> 0.005 is more than 10% which is somewhat problematic.
+
+With a probability of 0.10, once sample sizes reach 100 for both samples, the use of the t-test p value is essentially the same as the chi-square p value. Even when one of the samples is 50 and the other 100 the proportion of p value differences \> 0.005 is still very low.
+
+Once probabilities drop to 0.05 and 0.01, the number of sampling units required to ensure the p values are essentially the same increases, to at least 200 sampling units for each sample with probability = 0.05 and more than 500 for each sample with probability = 0.01.
+
+For low probabilities the failure of the chi-square and t test p values to converge doesn't necessarily mean that one of the p values is better than the other, though I'd be inclined to trust the chi-square value more than the t value. It's likely, however, that the chi-square value is also suspect for small probabilities and relatively small sample sizes. This is exactly what I found in a separate analysis of chi-square type I error rates for various probabilities and sample sizes.
+
+Finally, notice that the p values from the t test are greater than the p values from the chi-square test in all scenarios, and, for most of them, more than 80% of the t test p values are higher than the chi-square p values. The difference in most cases, however, is not very large. This is the reason the unequal variance option (var.equal = FALSE) t test was not selected in the code above: selecting that option increases the p value from the t test even more.
+
+## Literature cited
