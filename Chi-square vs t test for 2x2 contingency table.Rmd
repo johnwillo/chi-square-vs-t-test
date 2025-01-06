@@ -1,8 +1,12 @@
 ---
 title: "Chi-square vs t-test for 2x2 contingency table"
 author: "John Willoughby"
-date: "2024/06/15"
+date: "`r Sys.Date()`"
 output: html_document
+knit: (function(input, encoding) {
+  rmarkdown::render(input,
+                    output_dir = "output",
+                    knit_root_dir = rprojroot::find_rstudio_root_file())})
 bibliography: references.bib
 ---
 
@@ -57,7 +61,6 @@ table(my.data2$status, my.data2$area)
 chisq.test(my.data2$status, my.data2$area, correct = FALSE)
 t.test(status ~ area, data = my.data2, var.equal = TRUE)
 
-
 ```
 
 For this data set, with reference and treatment frequencies of 0.04 and 0.025, respectively, the p values obtained from the chi-square and t tests are still essentially the same to 3 decimals.
@@ -110,10 +113,10 @@ The following combinations of probability, n1 size, and n2 size are run:
 | 0.50 | 400  | 400  |
 | 0.50 | 1000 | 1000 |
 
-Set the number of simulations to run.
+Set the number of simulations to run. On my computer 1000 simulations took about 33 seconds to run and 5000 simulations took just over 9 minutes.
 
 ```{r}
-nreps = 1000
+nreps = 5000
 ```
 
 Create a data frame with combinations of probabilities and sample sizes for the two samples, n1 and n2, and enough rows to accommodate the number of simulations in nreps above. Add columns p.chi and p.t and fill with NA. The p values for these columns will be filled in by the for loop below.
@@ -138,6 +141,7 @@ Note that warnings are turned off in the code creating this data frame. With sma
 This is because when at least one of the cells in the contingency table used for the chi-square test is "sparse", meaning that it has fewer than 5 observations, R returns a warning that the test may be unreliable. Based on a separate analysis I did looking at the realized type I error rates from simulating many chi-square tests, I found that the type I error rate met the desired rate when sample sizes in both areas were at least 50 and probabilities were \>= 0.1. For a a probability of 0.05, at least 100 sampling units in each area were required. A probability of 0.025 required at least 200 sampling units in each area, and a probability of 0.01 required 400-500 sampling units in each area.
 
 ```{r warning = FALSE}
+
 for(i in 1:nrow(combos)){
   samp1 = rbinom(combos$n1[i], size = 1, prob = combos$p[i])
   samp2 = rbinom(combos$n2[i], size = 1, prob = combos$p[i])
@@ -148,6 +152,7 @@ for(i in 1:nrow(combos)){
   combos[i, 4] = p.chi
   combos[i,5] = p.t
 }
+
 ```
 
 Calculate the difference between the p values for each of the chi-square and t tests and then calculate summary stats for each combination of p, n1, and n2. Summary stats include the mean difference between the two p values (chi-square minus t), the minimum difference, the maximum difference, and the number of absolute differences greater than 0.005. I set the threshold to 0.005 because any difference less than that I consider to support the conclusion that the t test is essentially equivalent to the chi-square test. I also calculate the proportion of times the p value from the t test is greater than the p value from the chi-square test.
